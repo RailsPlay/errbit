@@ -64,6 +64,7 @@ GEM
     rack (1.2.1)
     rack-mount (0.6.13)
       rack (>= 1.0.0)
+    rack-ssl-enforcer (0.2.1)
     rack-test (0.5.6)
       rack (>= 1.0)
     rails (3.0.3)
@@ -109,6 +110,7 @@ DEPENDENCIES
   haml
   libxml-ruby
   mongoid (~> 2.0.0.rc.6)
+  rack-ssl-enforcer
   rails (= 3.0.3)
   rspec (~> 2.1)
   rspec-rails (~> 2.1)

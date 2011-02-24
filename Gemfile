@@ -8,6 +8,10 @@ gem 'haml'
 gem 'will_paginate'
 gem 'devise', '~> 1.1.3'
 
+group :production do
+  gem 'rack-ssl-enforcer'
+end
+
 group :development, :test do
   gem 'rspec-rails', '~> 2.1'
 end
