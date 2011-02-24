@@ -5,6 +5,9 @@ tmp/**/*
 config/config.yml
 config/deploy.rb
 config/mongoid.yml
+vendor/bundle/*
+!vendor/bundle/cache/*.gem
 .rvmrc
 *~
 *.rbc
+

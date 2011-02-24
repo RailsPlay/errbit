@@ -23,6 +23,10 @@ platform :ruby do
   gem 'bson_ext', '~> 1.3.1'
 end
 
+group :production do
+  gem 'rack-ssl-enforcer'
+end
+
 group :development, :test do
   gem 'rspec-rails', '~> 2.5'
   gem 'webmock', :require => false
