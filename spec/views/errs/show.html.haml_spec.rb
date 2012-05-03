@@ -2,13 +2,15 @@ require 'spec_helper'
 
 describe "errs/show.html.haml" do
   before do
-    err = Factory(:err)
-    comment = Factory(:comment)
-    assign :err, err
+    err = Fabricate(:err)
+    problem = err.problem
+    comment = Fabricate(:comment)
+    assign :problem, problem
     assign :comment, comment
-    assign :app, err.app
-    assign :notices, err.notices.ordered.paginate(:page => 1, :per_page => 1)
+    assign :app, problem.app
+    assign :notices, err.notices.page(1).per(1)
     assign :notice, err.notices.first
+    controller.stub(:current_user) { Fabricate(:user) }
   end
 
   describe "content_for :action_bar" do
@@ -36,6 +38,24 @@ describe "errs/show.html.haml" do
       resolve_link.should_not =~ /data-confirm=/
     end
 
+    it "should link 'up' to HTTP_REFERER if is set" do
+      url = 'http://localhost:3000/errs'
+      controller.request.env['HTTP_REFERER'] = url
+      render
+      action_bar = String.new(view.instance_variable_get(:@_content_for)[:action_bar])
+      action_bar.should =~ /<span><a href=\"#{url}\" class=\"up\">up<\/a><\/span>/
+    end
+
+    it "should link 'up' to app_errs_path if HTTP_REFERER isn't set'" do
+      controller.request.env['HTTP_REFERER'] = nil
+      problem = Fabricate(:problem_with_comments)
+      assign :problem, problem
+      assign :app, problem.app
+      render
+      action_bar = String.new(view.instance_variable_get(:@_content_for)[:action_bar])
+      action_bar.should =~ /<span><a href=\"#{app_errs_path(problem.app)}\" class=\"up\">up<\/a><\/span>/
+    end
+
   end
 
   describe "content_for :comments with comments disabled for configured issue tracker" do
@@ -44,9 +64,9 @@ describe "errs/show.html.haml" do
     end
 
     it 'should display comments and new comment form when no issue tracker' do
-      err = Factory(:err_with_comments)
-      assign :err, err
-      assign :app, err.app
+      problem = Fabricate(:problem_with_comments)
+      assign :problem, problem
+      assign :app, problem.app
       render
       comments_section = String.new(view.instance_variable_get(:@_content_for)[:comments])
       comments_section.should =~ /Test comment/
@@ -54,20 +74,23 @@ describe "errs/show.html.haml" do
     end
 
     context "with issue tracker" do
-      def with_issue_tracker(err)
-        err.app.issue_tracker = PivotalLabsTracker.new :api_token => "token token token", :project_id => "1234"
-        assign :err, err
-        assign :app, err.app
+      def with_issue_tracker(problem)
+        problem.app.issue_tracker = PivotalLabsTracker.new :api_token => "token token token", :project_id => "1234"
+        assign :problem, problem
+        assign :app, problem.app
       end
 
       it 'should not display the comments section' do
-        with_issue_tracker(Factory(:err))
+        problem = Fabricate(:problem)
+        with_issue_tracker(problem)
         render
         view.instance_variable_get(:@_content_for)[:comments].should be_blank
       end
 
       it 'should display existing comments' do
-        with_issue_tracker(Factory(:err_with_comments))
+        problem = Fabricate(:problem_with_comments)
+        problem.reload
+        with_issue_tracker(problem)
         render
         comments_section = String.new(view.instance_variable_get(:@_content_for)[:comments])
         comments_section.should =~ /Test comment/

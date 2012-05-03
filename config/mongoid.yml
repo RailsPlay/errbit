@@ -1,20 +1,10 @@
-defaults: &defaults
-  # slaves:
-  #   - host: slave1.local
-  #     port: 27018
-  #   - host: slave2.local
-  #     port: 27019
-
 development:
-  <<: *defaults
   host: localhost
-  database: rp-mon-dev
+  database: errbit-dev
 
 test:
-  <<: *defaults
   host: localhost
-  database: rp-mon-test
+  database: errbit-test
 
 production:
-  <<: *defaults
-  uri: <%= ENV['MONGODB_URI'] %>
+  uri: <%= ENV['MONGODB_URL'] %>

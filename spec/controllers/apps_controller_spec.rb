@@ -6,11 +6,12 @@ describe AppsController do
   it_requires_authentication
   it_requires_admin_privileges :for => {:new => :get, :edit => :get, :create => :post, :update => :put, :destroy => :delete}
 
+
   describe "GET /apps" do
     context 'when logged in as an admin' do
       it 'finds all apps' do
-        sign_in Factory(:admin)
-        3.times { Factory(:app) }
+        sign_in Fabricate(:admin)
+        3.times { Fabricate(:app) }
         apps = App.all
         get :index
         assigns(:apps).should == apps
@@ -19,12 +20,12 @@ describe AppsController do
 
     context 'when logged in as a regular user' do
       it 'finds apps the user is watching' do
-        sign_in(user = Factory(:user))
-        unwatched_app = Factory(:app)
-        watched_app1 = Factory(:app)
-        watched_app2 = Factory(:app)
-        Factory(:user_watcher, :user => user, :app => watched_app1)
-        Factory(:user_watcher, :user => user, :app => watched_app2)
+        sign_in(user = Fabricate(:user))
+        unwatched_app = Fabricate(:app)
+        watched_app1 = Fabricate(:app)
+        watched_app2 = Fabricate(:app)
+        Fabricate(:user_watcher, :user => user, :app => watched_app1)
+        Fabricate(:user_watcher, :user => user, :app => watched_app2)
         get :index
         assigns(:apps).should include(watched_app1, watched_app2)
         assigns(:apps).should_not include(unwatched_app)
@@ -35,11 +36,10 @@ describe AppsController do
   describe "GET /apps/:id" do
     context 'logged in as an admin' do
       before(:each) do
-        @user = Factory(:admin)
+        @user = Fabricate(:admin)
         sign_in @user
-        @app = Factory(:app)
-        @err = Factory :err, :app => @app
-        @notice = Factory :notice, :err => @err
+        @app = Fabricate(:app)
+        @problem = Fabricate(:notice, :err => Fabricate(:err, :problem => Fabricate(:problem, :app => @app))).problem
       end
 
       it 'finds the app' do
@@ -48,50 +48,51 @@ describe AppsController do
       end
 
       it "should not raise errors for app with err without notices" do
-        Factory :err, :app => @app
+        Fabricate(:err, :problem => Fabricate(:problem, :app => @app))
         lambda { get :show, :id => @app.id }.should_not raise_error
       end
 
       it "should list atom feed successfully" do
         get :show, :id => @app.id, :format => "atom"
         response.should be_success
-        response.body.should match(@err.message)
+        response.body.should match(@problem.message)
       end
 
       context "pagination" do
         before(:each) do
-          35.times { Factory :err, :app => @app }
+          35.times { Fabricate(:err, :problem => Fabricate(:problem, :app => @app)) }
         end
 
         it "should have default per_page value for user" do
           get :show, :id => @app.id
-          assigns(:errs).size.should == User::PER_PAGE
+          assigns(:problems).to_a.size.should == User::PER_PAGE
         end
 
         it "should be able to override default per_page value" do
           @user.update_attribute :per_page, 10
           get :show, :id => @app.id
-          assigns(:errs).size.should == 10
+          assigns(:problems).to_a.size.should == 10
         end
       end
 
       context 'with resolved errors' do
         before(:each) do
-          resolved_err = Factory.create(:err, :app => @app, :resolved => true)
-          Factory.create(:notice, :err => resolved_err)
+          resolved_problem = Fabricate(:problem, :app => @app)
+          Fabricate(:notice, :err => Fabricate(:err, :problem => resolved_problem))
+          resolved_problem.resolve!
         end
 
         context 'and no params' do
-          it 'shows only unresolved errs' do
+          it 'shows only unresolved problems' do
             get :show, :id => @app.id
-            assigns(:errs).size.should == 1
+            assigns(:problems).size.should == 1
           end
         end
 
-        context 'and all_errs=true params' do
+        context 'and all_problems=true params' do
           it 'shows all errors' do
             get :show, :id => @app.id, :all_errs => true
-            assigns(:errs).size.should == 2
+            assigns(:problems).size.should == 2
           end
         end
       end
@@ -100,42 +101,42 @@ describe AppsController do
         before(:each) do
           environments = ['production', 'test', 'development', 'staging']
           20.times do |i|
-            Factory.create(:err, :app => @app, :environment => environments[i % environments.length])
+            Fabricate(:problem, :app => @app, :environment => environments[i % environments.length])
           end
         end
 
         context 'no params' do
           it 'shows errs for all environments' do
             get :show, :id => @app.id
-            assigns(:errs).size.should == 21
+            assigns(:problems).size.should == 21
           end
         end
 
         context 'environment production' do
           it 'shows errs for just production' do
-            get :show, :id => @app.id, :environment => :production
-            assigns(:errs).size.should == 6
+            get :show, :id => @app.id, :environment => 'production'
+            assigns(:problems).size.should == 6
           end
         end
 
         context 'environment staging' do
           it 'shows errs for just staging' do
-            get :show, :id => @app.id, :environment => :staging
-            assigns(:errs).size.should == 5
+            get :show, :id => @app.id, :environment => 'staging'
+            assigns(:problems).size.should == 5
           end
         end
 
         context 'environment development' do
           it 'shows errs for just development' do
-            get :show, :id => @app.id, :environment => :development
-            assigns(:errs).size.should == 5
+            get :show, :id => @app.id, :environment => 'development'
+            assigns(:problems).size.should == 5
           end
         end
 
         context 'environment test' do
           it 'shows errs for just test' do
-            get :show, :id => @app.id, :environment => :test
-            assigns(:errs).size.should == 5
+            get :show, :id => @app.id, :environment => 'test'
+            assigns(:problems).size.should == 5
           end
         end
       end
@@ -143,17 +144,17 @@ describe AppsController do
 
     context 'logged in as a user' do
       it 'finds the app if the user is watching it' do
-        user = Factory(:user)
-        app = Factory(:app)
-        watcher = Factory(:user_watcher, :app => app, :user => user)
+        user = Fabricate(:user)
+        app = Fabricate(:app)
+        watcher = Fabricate(:user_watcher, :app => app, :user => user)
         sign_in user
         get :show, :id => app.id
         assigns(:app).should == app
       end
 
       it 'does not find the app if the user is not watching it' do
-        sign_in Factory(:user)
-        app = Factory(:app)
+        sign_in Fabricate(:user)
+        app = Fabricate(:app)
         lambda {
           get :show, :id => app.id
         }.should raise_error(Mongoid::Errors::DocumentNotFound)
@@ -163,7 +164,7 @@ describe AppsController do
 
   context 'logged in as an admin' do
     before do
-      sign_in Factory(:admin)
+      sign_in Fabricate(:admin)
     end
 
     describe "GET /apps/new" do
@@ -175,7 +176,7 @@ describe AppsController do
       end
 
       it "should copy attributes from an existing app" do
-        @app = Factory(:app, :name => "do not copy",
+        @app = Fabricate(:app, :name => "do not copy",
                              :github_url => "github.com/test/example")
         get :new, :copy_attributes_from => @app.id
         assigns(:app).should be_a(App)
@@ -187,7 +188,7 @@ describe AppsController do
 
     describe "GET /apps/:id/edit" do
       it 'finds the correct app' do
-        app = Factory(:app)
+        app = Fabricate(:app)
         get :edit, :id => app.id
         assigns(:app).should == app
       end
@@ -195,7 +196,7 @@ describe AppsController do
 
     describe "POST /apps" do
       before do
-        @app = Factory(:app)
+        @app = Fabricate(:app)
         App.stub(:new).and_return(@app)
       end
 
@@ -218,7 +219,7 @@ describe AppsController do
 
     describe "PUT /apps/:id" do
       before do
-        @app = Factory(:app)
+        @app = Fabricate(:app)
       end
 
       context "when the update is successful" do
@@ -256,7 +257,7 @@ describe AppsController do
         end
         context "failed parsing of CSV" do
           it "should set the default value" do
-            @app = Factory(:app, :email_at_notices => [1, 2, 3, 4])
+            @app = Fabricate(:app, :email_at_notices => [1, 2, 3, 4])
             put :update, :id => @app.id, :app => { :email_at_notices => 'asdf, -1,0,foobar,gd00,0,abc' }
             @app.reload
             @app.email_at_notices.should == Errbit::Config.email_at_notices
@@ -287,11 +288,12 @@ describe AppsController do
           context tracker_klass do
             it "should save tracker params" do
               params = tracker_klass::Fields.inject({}){|hash,f| hash[f[0]] = "test_value"; hash }
-              params['ticket_properties'] = "card_type = defect" if tracker_klass == MingleTracker
-              params['type'] = tracker_klass.to_s
+              params[:ticket_properties] = "card_type = defect" if tracker_klass == MingleTracker
+              params[:type] = tracker_klass.to_s
               put :update, :id => @app.id, :app => {:issue_tracker_attributes => params}
 
               @app.reload
+
               tracker = @app.issue_tracker
               tracker.should be_a(tracker_klass)
               tracker_klass::Fields.each do |field, field_info|
@@ -305,7 +307,7 @@ describe AppsController do
             it "should show validation notice when sufficient params are not present" do
               # Leave out one required param
               params = tracker_klass::Fields[1..-1].inject({}){|hash,f| hash[f[0]] = "test_value"; hash }
-              params['type'] = tracker_klass.to_s
+              params[:type] = tracker_klass.to_s
               put :update, :id => @app.id, :app => {:issue_tracker_attributes => params}
 
               @app.reload
@@ -319,7 +321,7 @@ describe AppsController do
 
     describe "DELETE /apps/:id" do
       before do
-        @app = Factory(:app)
+        @app = Fabricate(:app)
         App.stub(:find).with(@app.id).and_return(@app)
       end
 
@@ -344,6 +346,7 @@ describe AppsController do
       end
     end
   end
+
 
 end
 
